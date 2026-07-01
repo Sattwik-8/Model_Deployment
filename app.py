@@ -1,65 +1,100 @@
 import streamlit as st
-import pandas as pd
-import pickle  # Changed from joblib to pickle
 import numpy as np
-import os
+import pandas as pd
+import pickle
 
-# --- PAGE CONFIG ---
-st.set_page_config(page_title="Iris Classifier", page_icon="🌸")
+# ---------------- Page Config ----------------
+st.set_page_config(
+    page_title="Iris Species Predictor",
+    page_icon="🌸",
+    layout="centered",
+    initial_sidebar_state="expanded"
+)
 
-# --- LOAD THE TRAINED MODEL ---
+# ---------------- Load Model ----------------
 @st.cache_resource
 def load_model():
-    # Update the path to look for the .pkl file
-    model_path = "iris_model.pkl" 
-    if os.path.exists(model_path):
-        with open(model_path, 'rb') as file:
-            return pickle.load(file)
-    else:
-        st.error(f"Model file '{model_path}' not found!")
-        return None
+    with open("iris_model.pkl", "rb") as f:
+        return pickle.load(f)
 
 model = load_model()
 
-# --- UI INTERFACE ---
+SPECIES = ["Setosa", "Versicolor", "Virginica"]
+SPECIES_IMAGES = {
+    "Setosa": "https://upload.wikimedia.org/wikipedia/commons/5/56/Kosaciec_szczecinkowaty_Iris_setosa.jpg",
+    "Versicolor": "https://upload.wikimedia.org/wikipedia/commons/4/41/Iris_versicolor_3.jpg",
+    "Virginica": "https://upload.wikimedia.org/wikipedia/commons/9/9f/Iris_virginica.jpg",
+}
+
+# ---------------- Header ----------------
 st.title("🌸 Iris Species Predictor")
-st.markdown("""
-This app uses a **Logistic Regression** model to predict the species of an Iris flower 
-based on its physical measurements.
-""")
+st.markdown(
+    "An end-to-end **Machine Learning + Deployment** project. "
+    "Adjust the flower measurements in the sidebar and the model "
+    "will predict the most likely Iris species in real time."
+)
 
-# Sidebar for user inputs
-st.sidebar.header("Input Floral Features")
+with st.expander("ℹ️ About this project"):
+    st.markdown(
+        """
+        - **Model**: Logistic Regression classifier trained on the classic Iris dataset
+        - **Input features**: Sepal length, Sepal width, Petal length, Petal width (cm)
+        - **Output**: Predicted species + confidence across all 3 classes
+        - **Stack**: scikit-learn (training) → Streamlit (UI) → Streamlit Cloud (deployment)
+        """
+    )
 
-def get_user_input():
-    # Ranges aligned with standard Iris dataset measurements
-    sepal_length = st.sidebar.slider("Sepal Length (cm)", 4.0, 8.0, 5.8)
-    sepal_width = st.sidebar.slider("Sepal Width (cm)", 2.0, 4.5, 3.0)
-    petal_length = st.sidebar.slider("Petal Length (cm)", 1.0, 7.0, 4.3)
-    petal_width = st.sidebar.slider("Petal Width (cm)", 0.1, 2.5, 1.3)
-    
+st.divider()
+
+# ---------------- Sidebar Inputs ----------------
+st.sidebar.header("🔧 Input Flower Measurements")
+
+sepal_length = st.sidebar.slider("Sepal length (cm)", 4.0, 8.0, 5.8, 0.1)
+sepal_width = st.sidebar.slider("Sepal width (cm)", 2.0, 4.5, 3.0, 0.1)
+petal_length = st.sidebar.slider("Petal length (cm)", 1.0, 7.0, 4.3, 0.1)
+petal_width = st.sidebar.slider("Petal width (cm)", 0.1, 2.5, 1.3, 0.1)
+
+st.sidebar.markdown("---")
+predict_btn = st.sidebar.button("🔍 Predict Species", use_container_width=True, type="primary")
+
+# Live snapshot of current inputs
+st.subheader("Current Input")
+input_df = pd.DataFrame(
+    {
+        "Feature": ["Sepal length", "Sepal width", "Petal length", "Petal width"],
+        "Value (cm)": [sepal_length, sepal_width, petal_length, petal_width],
+    }
+)
+st.dataframe(input_df, hide_index=True, use_container_width=True)
+
+# ---------------- Prediction ----------------
+if predict_btn:
     features = np.array([[sepal_length, sepal_width, petal_length, petal_width]])
-    return features
+    prediction = model.predict(features)[0]
+    probabilities = model.predict_proba(features)[0]
 
-input_data = get_user_input()
+    predicted_species = SPECIES[prediction] if isinstance(prediction, (int, np.integer)) else prediction
 
-# --- PREDICTION LOGIC ---
-if model is not None:
-    # Standard labels for the Iris dataset
-    target_names = ['Setosa', 'Versicolor', 'Virginica']
-    
-    if st.button("Predict Species"):
-        prediction = model.predict(input_data)
-        probability = model.predict_proba(input_data)
-        
-        species = target_names[prediction[0]]
-        
-        # Display Results
-        st.success(f"### Result: {species}")
-        
-        # Visualizing probabilities
-        st.write("#### Prediction Probabilities:")
-        prob_df = pd.DataFrame(probability, columns=target_names)
-        st.bar_chart(prob_df.T)
+    st.divider()
+    st.subheader("🎯 Prediction Result")
+
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        img_url = SPECIES_IMAGES.get(str(predicted_species).capitalize())
+        if img_url:
+            st.image(img_url, caption=predicted_species, use_container_width=True)
+    with col2:
+        st.success(f"**Predicted Species: {predicted_species}**")
+        confidence = max(probabilities) * 100
+        st.metric("Confidence", f"{confidence:.1f}%")
+
+    st.markdown("#### Prediction Probabilities")
+    prob_df = pd.DataFrame({"Species": SPECIES, "Probability": probabilities}).set_index("Species")
+    st.bar_chart(prob_df)
+
 else:
-    st.warning("Please upload 'iris_model.pkl' to the directory to enable predictions.")
+    st.info("👈 Set the measurements in the sidebar and click **Predict Species** to see results.")
+
+# ---------------- Footer ----------------
+st.divider()
+st.caption("Built with Streamlit · scikit-learn · Deployed on Streamlit Community Cloud")
