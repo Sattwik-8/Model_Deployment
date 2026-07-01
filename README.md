@@ -57,7 +57,7 @@ An **Iris Species Classifier** built with **scikit-learn**, deployed as an inter
 ## Sample Screenshot
 Below: the app UI showing an input configuration and the resulting prediction with confidence breakdown.
 
-![App Screenshot](screenshots/app_ui.png)
+![App Screenshot](screenshot/app-ui.png)
 
 ---
 
